@@ -6,7 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 class Parser {
-  private static class ParseError extends RuntimeException {}
+  private static final class ParseError extends RuntimeException {}
 
   private final List<Token> tokens;
   private int current = 0;

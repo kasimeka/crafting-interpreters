@@ -61,6 +61,8 @@
 
   <module name="TreeWalker">
     <module name="FinalLocalVariable"/> <!-- my first customisation :) -->
+    <!-- <module name="FinalParameters"/> -->
+    <module name="FinalClass"/>
     <module name="OuterTypeFilename"/>
     <module name="IllegalTokenText">
       <property name="tokens" value="STRING_LITERAL, CHAR_LITERAL"/>
