@@ -31,7 +31,7 @@ class AstPrinter implements Expr.Visitor<String> {
   public String visitLiteralExpr(Expr.Literal expr) {
     final var v = expr.value();
     if (v == null) return "nil";
-    return v.toString();
+    return "«" + v.toString() + "»";
   }
 
   @Override
