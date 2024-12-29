@@ -24,13 +24,13 @@ class Parser {
   }
 
   private Expr ternary() {
-    List<Expr> conditionals = new ArrayList<>();
+    final var conditionals = new ArrayList<Expr>();
     conditionals.add(sequence());
     while (consumeOneOf(QUESTION_MARK)) {
       conditionals.add(sequence());
     }
 
-    // 1 ? 2 ? 3 : 4 : 5
+    // [1 ? 2 ?] 3 [: 4 : 5]
     var expr = conditionals.removeLast(); // [?] 3 [:]
     for (var c : conditionals.reversed()) {
       mustConsume(COLON, "Expected ':' in ternary expression.");
@@ -127,8 +127,10 @@ class Parser {
         case CLASS, FUN, VAR, FOR, IF, WHILE, PRINT, RETURN -> {
           return;
         }
+        default -> {
+          advance();
+        }
       }
-      advance();
     }
   }
 

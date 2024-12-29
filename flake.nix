@@ -57,7 +57,11 @@
 
         devShell = pkgs.mkShell {
           inputsFrom = [jar drv];
-          packages = with pkgs; [java-language-server google-java-format];
+          packages = with pkgs; [
+            java-language-server
+            google-java-format
+            checkstyle
+          ];
           shellHook = ''echo "with love from wrd :)"'';
         };
       }
