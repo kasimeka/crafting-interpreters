@@ -46,10 +46,15 @@ public class Lox {
     final var tokens = scanner.scanTokens();
 
     final var parser = new Parser(tokens);
+    // we're doing only one expression
     final var expr = parser.parse();
-    if (hadError) return;
 
+    if (hadError) return;
     System.out.println(new AstPrinter().print(expr));
+
+    final var value = expr.accept(new Interpreter());
+    final var str = value == null ? "null" : value.toString();
+    System.out.println("  -> " + str);
   }
 
   static void error(int line, String message) {

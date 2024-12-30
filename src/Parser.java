@@ -124,12 +124,8 @@ class Parser {
     while (!atEof()) {
       if (previous().kind() == SEMICOLON) return;
       switch (peek().kind()) {
-        case CLASS, FUN, VAR, FOR, IF, WHILE, PRINT, RETURN -> {
-          return;
-        }
-        default -> {
-          advance();
-        }
+        case CLASS, FUN, VAR, FOR, IF, WHILE, PRINT, RETURN -> {}
+        default -> advance();
       }
     }
   }
