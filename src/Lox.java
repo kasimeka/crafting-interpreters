@@ -9,6 +9,7 @@ import java.nio.file.Paths;
 
 public class Lox {
   static boolean hadError = false;
+  static boolean hadRuntimeError = false;
 
   public static void main(String[] args) throws IOException {
     if (args.length > 1) {
@@ -26,6 +27,7 @@ public class Lox {
     final var bytes = Files.readAllBytes(Paths.get(path));
     run(new String(bytes, Charset.defaultCharset()));
     if (hadError) System.exit(65);
+    if (hadRuntimeError) System.exit(70);
   }
 
   private static void runPrompt() throws IOException {
@@ -33,11 +35,12 @@ public class Lox {
     final var reader = new BufferedReader(input);
 
     while (true) {
-      System.out.print("> ");
+      System.out.print(">>> ");
       final var line = reader.readLine();
       if (line == null) break;
       run(line);
       hadError = false;
+      hadRuntimeError = false;
     }
   }
 
@@ -46,15 +49,22 @@ public class Lox {
     final var tokens = scanner.scanTokens();
 
     final var parser = new Parser(tokens);
-    // we're doing only one expression
-    final var expr = parser.parse();
-
+    final var expr = parser.parse(); // we're doing only one expression
     if (hadError) return;
-    System.out.println(new AstPrinter().print(expr));
 
-    final var value = expr.accept(new Interpreter());
-    final var str = value == null ? "null" : value.toString();
-    System.out.println("  -> " + str);
+    final var printer = new AstPrinter();
+    System.out.println(printer.print(expr));
+
+    final var interpreter = new Interpreter();
+    final var value = interpreter.interpret(expr);
+    if (hadRuntimeError) return;
+
+    System.out.println("--> " + value);
+  }
+
+  static void runtimeError(Interpreter.RuntimeError error) {
+    hadRuntimeError = true;
+    error(error.token.line(), error.getMessage());
   }
 
   static void error(int line, String message) {

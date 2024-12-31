@@ -8,10 +8,38 @@ class Interpreter implements Expr.Visitor<Object> {
     final Expr expr;
 
     RuntimeError(Expr expr, Token token, String message) {
-      super(message);
-      this.token = token;
+      super(printer.print(expr) + ": " + message);
       this.expr = expr;
+      this.token = token;
     }
+  }
+
+  String interpret(Expr expression) {
+    try {
+      final var value = evaluate(expression);
+      return stringify(value);
+    } catch (RuntimeError error) {
+      Lox.runtimeError(error);
+      return "";
+    }
+  }
+
+  private String stringify(Object object) {
+    if (object == null) return "nil";
+
+    if (object instanceof Double) {
+      String text = object.toString();
+      if (text.endsWith(".0")) {
+        text = text.substring(0, text.length() - 2);
+      }
+      return text;
+    }
+
+    return object.toString();
+  }
+
+  private Object evaluate(Expr expr) {
+    return expr.accept(this);
   }
 
   @Override
@@ -24,40 +52,24 @@ class Interpreter implements Expr.Visitor<Object> {
     return evaluate(expr.expression());
   }
 
-  private Object evaluate(Expr expr) {
-    return expr.accept(this);
-  }
-
   @Override
   public Object visitUnaryExpr(Expr.Unary expr) {
     final var operator = expr.operator();
-    final var right = evaluate(expr.right());
+    final var operand = evaluate(expr.right());
     final var k = operator.kind();
     return switch (k) {
       case MINUS -> {
-        if (!(right instanceof Double))
-          throw new RuntimeError(expr, operator, "Operand must be a number.");
-        yield -(double) right;
+        checkOperands(Number.class, expr, operator, operand);
+        yield -(double) operand;
       }
       case BANG -> {
-        if (!(right instanceof Boolean))
-          throw new RuntimeError(expr, operator, "Operand must be a boolean.");
-        yield !isTruthy(right);
+        checkOperands(Boolean.class, expr, operator, operand);
+        yield !isTruthy(operand);
       }
-      default ->
-          throw new RuntimeError(expr, operator, "unimplemented unary operator " + k.toString());
+      default -> {
+        throw new RuntimeError(expr, operator, "unimplemented unary operator " + k.toString());
+      }
     };
-  }
-
-  private boolean checkNumberOperand(Token operator, Object operand) {
-    return (operand instanceof Double);
-    // throw new RuntimeError(operator, "Operand must be a number.");
-  }
-
-  private boolean isTruthy(Object value) {
-    if (value == null) return false; // null is a bitch in java :(
-    // the book only considers nil and false as falsey
-    return !(value.equals(false) || value.equals(0.0));
   }
 
   @Override
@@ -68,29 +80,46 @@ class Interpreter implements Expr.Visitor<Object> {
     final var right = evaluate(expr.right());
 
     final var k = operator.kind();
-    return switch (k) {
-      case MINUS -> (double) left - (double) right;
-      case SLASH -> (double) left / (double) right;
-      case PLUS -> {
-        if (left instanceof Double && right instanceof Double) {
-          yield (double) left + (double) right;
+    try {
+      return switch (k) {
+        case PLUS -> {
+          if (left instanceof Double && right instanceof Double) {
+            yield (double) left + (double) right;
+          }
+          if (left instanceof String && right instanceof String) {
+            yield (String) left + (String) right;
+          }
+          throw new RuntimeError(expr, operator, "type mismatch between operands");
         }
-        if (left instanceof String && right instanceof String) {
-          yield (String) left + (String) right;
+        case MINUS -> (double) left - (double) right;
+        case SLASH -> (double) left / (double) right;
+        case STAR -> (double) left * (double) right;
+        case GREATER -> (double) left > (double) right;
+        case GREATER_EQUAL -> (double) left >= (double) right;
+        case LESS -> (double) left < (double) right;
+        case LESS_EQUAL -> (double) left <= (double) right;
+        case BANG_EQUAL -> !isEqual(left, right);
+        case EQUAL_EQUAL -> isEqual(left, right);
+        default -> {
+          throw new RuntimeError(expr, operator, "unimplemented binary operator " + k.toString());
         }
-        throw new RuntimeError(expr, operator, "type mismatch in the shallowest (+)");
-      }
-      case STAR -> (double) left * (double) right;
-      case GREATER -> (double) left > (double) right;
-      case GREATER_EQUAL -> (double) left >= (double) right;
-      case LESS -> (double) left < (double) right;
-      case LESS_EQUAL -> (double) left <= (double) right;
-      case BANG_EQUAL -> !isEqual(left, right);
-      case EQUAL_EQUAL -> isEqual(left, right);
+      };
+    } catch (ClassCastException _exc) {
+      checkOperands(Number.class, expr, operator, right);
+      throw new RuntimeException("unreachable");
+    }
+  }
 
-      default ->
-          throw new RuntimeError(expr, operator, "unimplemented unary operator " + k.toString());
-    };
+  @Override
+  public Object visitTernaryExpr(Expr.Ternary expr) {
+    // TODO
+    return null;
+  }
+
+  private boolean isTruthy(Object value) {
+    if (value == null) return false; // null is a bitch in java :(
+    // the book only considers nil and false as falsey
+    return !(value.equals(false) || value.equals(0.0));
   }
 
   private boolean isEqual(Object left, Object right) {
@@ -99,9 +128,12 @@ class Interpreter implements Expr.Visitor<Object> {
     return left.equals(right); // this mean NaN equals NaN
   }
 
-  @Override
-  public Object visitTernaryExpr(Expr.Ternary expr) {
-    // TODO
-    return null;
+  private void checkOperands(Class<?> type, Expr expr, Token operator, Object... operands) {
+    for (Object operand : operands) {
+      if (!type.isInstance(operand)) {
+        throw new RuntimeError(
+            expr, operator, "Operands must be " + type.getSimpleName().toLowerCase() + "s.");
+      }
+    }
   }
 }
