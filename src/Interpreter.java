@@ -75,7 +75,7 @@ class Interpreter implements Expr.Visitor<Object> {
   @Override
   public Object visitBinaryExpr(Expr.Binary expr) {
     final var operator = expr.operator();
-    // can't short circuit boolean operators yet
+    // can't short circuit boolean operators
     final var left = evaluate(expr.left());
     final var right = evaluate(expr.right());
 
@@ -92,7 +92,8 @@ class Interpreter implements Expr.Visitor<Object> {
           throw new RuntimeError(expr, operator, "type mismatch between operands");
         }
         case MINUS -> (double) left - (double) right;
-        case SLASH -> (double) left / (double) right;
+        // if (right.equals(0.0)) throw new RuntimeError(expr, operator, "devision by zero :(");
+        case SLASH -> (double) left / (double) right; // div by zero returns Infinity
         case STAR -> (double) left * (double) right;
         case GREATER -> (double) left > (double) right;
         case GREATER_EQUAL -> (double) left >= (double) right;
@@ -112,8 +113,7 @@ class Interpreter implements Expr.Visitor<Object> {
 
   @Override
   public Object visitTernaryExpr(Expr.Ternary expr) {
-    // TODO
-    return null;
+    return isTruthy(expr.condition()) ? evaluate(expr.first()) : evaluate(expr.second());
   }
 
   private boolean isTruthy(Object value) {
