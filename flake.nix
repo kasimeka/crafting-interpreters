@@ -19,7 +19,26 @@
         jre = pkgs.graalvmPackages.graalvm-ce-musl;
         graalvmDrv = pkgs.graalvmPackages.graalvm-ce-musl;
 
-        generate-expr-file = pkgs.callPackage ./hack/generate-expr.nix {};
+        generate-grammar-classes = (pkgs.callPackage
+          ./hack/generate-grammar-classes.nix {}) [
+          {
+            name = "Expr";
+            records = {
+              Binary = "Expr left, Token operator, Expr right";
+              Unary = "Token operator, Expr right";
+              Grouping = "Expr expression";
+              Literal = "Object value";
+              Ternary = "Expr condition, Expr first, Expr second";
+            };
+          }
+          {
+            name = "Stmt";
+            records = {
+              Expression = "Expr expression";
+              Print = "Expr expression";
+            };
+          }
+        ];
 
         pname = "jlox";
         version = "0.0.0-dev";
@@ -34,9 +53,17 @@
           src = ./src;
 
           buildInputs = [jre];
-          nativeBuildInputs = [jdk pkgs.stripJavaArchivesHook];
+          nativeBuildInputs = [
+            jdk
+            pkgs.stripJavaArchivesHook
+            self.packages.${system}.generate-grammar-classes
+          ];
 
-          buildPhase = ''find . -name '*.java' -type f -exec javac -d build/ {} +'';
+          buildPhase = ''
+            install -Dm644 -t src $src/*
+            ${pkgs.lib.getExe self.packages.${system}.generate-grammar-classes}
+            find src -name '*.java' -type f -exec javac -d build/ {} +
+          '';
           installPhase = ''
             (cd build && jar cvfe $out/share/java/${pname}.jar ${mainClass} *)
             mkdir -p $out/bin && cat <<EOF > $out/bin/${pname}
@@ -49,7 +76,7 @@
         };
       in {
         packages = {
-          inherit generate-expr-file;
+          inherit generate-grammar-classes;
           default = self.packages.${system}.native;
           native = drv;
           jvm = jar;
