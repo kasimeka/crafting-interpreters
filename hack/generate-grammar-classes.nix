@@ -8,10 +8,12 @@
   gen-class = {
     name,
     records,
+    imports ? [],
   }: ''
     cat ${writeText "${name}.java" (lib.concatStringsSep "\n" [
       ''
         package com.craftinginterpreters.lox;
+        ${lib.concatMapStringsSep "\n" (i: "import ${i};") imports}
 
         public interface ${name} {
           abstract <R> R accept(Visitor<R> visitor);

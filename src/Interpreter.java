@@ -1,27 +1,53 @@
 package com.craftinginterpreters.lox;
 
-class Interpreter implements Expr.Visitor<Object> {
-  private static final AstPrinter printer = new AstPrinter();
+import java.util.List;
+import java.util.Optional;
 
-  class RuntimeError extends RuntimeException {
+class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
+  private static final AstPrinter printer = new AstPrinter();
+  private Environment environment = new Environment();
+
+  static class RuntimeError extends RuntimeException {
     final Token token;
-    final Expr expr;
 
     RuntimeError(Expr expr, Token token, String message) {
-      super(printer.print(expr) + ": " + message);
-      this.expr = expr;
+      super(Optional.ofNullable(expr).map(e -> printer.print(e) + ": ").orElse("") + message);
       this.token = token;
     }
   }
 
-  String interpret(Expr expression) {
+  void repl(List<Stmt> statements) {
+    repl(statements, this.environment);
+  }
+
+  void repl(List<Stmt> statements, Environment environment) {
+    final var previous = this.environment;
     try {
-      final var value = evaluate(expression);
-      return stringify(value);
+      this.environment = environment;
+      for (Stmt stmt : statements) {
+        switch (stmt) {
+          case Stmt.Block b -> repl(b.statements(), new Environment(environment));
+          case Stmt.Expression e -> execute(new Stmt.Print(e.expression()));
+          default -> execute(stmt);
+        }
+      }
     } catch (RuntimeError error) {
       Lox.runtimeError(error);
-      return "";
+    } finally {
+      this.environment = previous;
     }
+  }
+
+  void interpret(List<Stmt> statements) {
+    try {
+      for (Stmt statement : statements) execute(statement);
+    } catch (RuntimeError error) {
+      Lox.runtimeError(error);
+    }
+  }
+
+  private void execute(Stmt stmt) {
+    stmt.accept(this);
   }
 
   private String stringify(Object object) {
@@ -40,6 +66,25 @@ class Interpreter implements Expr.Visitor<Object> {
 
   private Object evaluate(Expr expr) {
     return expr.accept(this);
+  }
+
+  @Override
+  public Void visitExpressionStmt(Stmt.Expression stmt) {
+    evaluate(stmt.expression());
+    return null;
+  }
+
+  @Override
+  public Void visitPrintStmt(Stmt.Print stmt) {
+    System.out.println(stringify(evaluate(stmt.expression())));
+    return null;
+  }
+
+  @Override
+  public Void visitVarStmt(Stmt.Var stmt) {
+    environment.define(
+        stmt.name().lexeme(), Optional.ofNullable(stmt.initializer()).map(this::evaluate));
+    return null;
   }
 
   @Override
@@ -116,6 +161,27 @@ class Interpreter implements Expr.Visitor<Object> {
     return isTruthy(expr.condition()) ? evaluate(expr.first()) : evaluate(expr.second());
   }
 
+  @Override
+  public Object visitVariableExpr(Expr.Variable expr) {
+    final var name = expr.name();
+    final var key = name.lexeme();
+
+    return environment
+        .get(key)
+        .orElseThrow(
+            () -> new RuntimeError(expr, name, "Variable `" + key + "` used before assignment"));
+  }
+
+  @Override
+  public Object visitAssignExpr(Expr.Assign expr) {
+    final var name = expr.name();
+    final var key = name.lexeme();
+    final var value = evaluate(expr.value()); // ! side effects always trigger
+    if (!environment.assign(key, value))
+      throw new RuntimeError(expr, name, "Undefined variable `" + key + "`.");
+    return value;
+  }
+
   private boolean isTruthy(Object value) {
     if (value == null) return false; // null is a bitch in java :(
     // the book only considers nil and false as falsey
@@ -134,6 +200,24 @@ class Interpreter implements Expr.Visitor<Object> {
         throw new RuntimeError(
             expr, operator, "Operands must be " + type.getSimpleName().toLowerCase() + "s.");
       }
+    }
+  }
+
+  @Override
+  public Void visitBlockStmt(Stmt.Block stmt) {
+    executeBlock(stmt.statements(), new Environment(environment));
+    return null;
+  }
+
+  void executeBlock(List<Stmt> statements, Environment environment) {
+    final var previous = this.environment;
+    try {
+      this.environment = environment;
+      for (Stmt statement : statements) {
+        execute(statement);
+      }
+    } finally {
+      this.environment = previous;
     }
   }
 }

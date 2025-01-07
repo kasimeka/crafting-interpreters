@@ -29,13 +29,18 @@
               Grouping = "Expr expression";
               Literal = "Object value";
               Ternary = "Expr condition, Expr first, Expr second";
+              Variable = "Token name";
+              Assign = "Token name, Expr value";
             };
           }
           {
             name = "Stmt";
+            imports = ["java.util.List"];
             records = {
+              Block = "List<Stmt> statements";
               Expression = "Expr expression";
               Print = "Expr expression";
+              Var = "Token name, Expr initializer";
             };
           }
         ];

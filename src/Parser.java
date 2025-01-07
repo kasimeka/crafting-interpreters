@@ -15,12 +15,56 @@ class Parser {
     this.tokens = tokens;
   }
 
-  Expr parse() {
+  List<Stmt> parse() {
+    final var statements = new ArrayList<Stmt>();
+    while (!atEof()) {
+      statements.add(declaration());
+    }
+    return statements;
+  }
+
+  private Stmt declaration() {
     try {
-      return ternary();
+      if (consumeOneOf(VAR)) return varDeclaration();
+      return statement();
     } catch (ParseError _error) {
+      synchronize();
       return null;
     }
+  }
+
+  private Stmt varDeclaration() {
+    final var name = mustConsume(IDENTIFIER, "Expected variable name.");
+    final var initializer = consumeOneOf(EQUAL) ? ternary() : null;
+    mustConsume(SEMICOLON, "Expected ';' after variable declaration.");
+    return new Stmt.Var(name, initializer);
+  }
+
+  private Stmt statement() {
+    if (consumeOneOf(PRINT)) return printStatement();
+    if (consumeOneOf(LEFT_BRACE)) return new Stmt.Block(block());
+    return expressionStatement();
+  }
+
+  private Stmt printStatement() {
+    final var value = ternary();
+    mustConsume(SEMICOLON, "Expected ';' after value.");
+    return new Stmt.Print(value);
+  }
+
+  private Stmt expressionStatement() {
+    final var expr = ternary();
+    mustConsume(SEMICOLON, "Expected ';' after expression.");
+    return new Stmt.Expression(expr);
+  }
+
+  private List<Stmt> block() {
+    final var statements = new ArrayList<Stmt>();
+    while (!check(RIGHT_BRACE) && !atEof()) {
+      statements.add(declaration());
+    }
+    mustConsume(RIGHT_BRACE, "Expect '}' after block.");
+    return statements;
   }
 
   private Expr ternary() {
@@ -51,7 +95,21 @@ class Parser {
   }
 
   private Expr expression() {
-    return equality();
+    return assignment();
+  }
+
+  private Expr assignment() {
+    final var expr = equality();
+    if (consumeOneOf(EQUAL)) {
+      final var equals = previous();
+      final var value = assignment();
+      if (expr instanceof Expr.Variable) {
+        final var name = ((Expr.Variable) expr).name();
+        return new Expr.Assign(name, value);
+      }
+      error(equals, "Invalid assignment target.");
+    }
+    return expr;
   }
 
   private Expr equality() {
@@ -112,9 +170,9 @@ class Parser {
       case LEFT_PAREN -> {
         final var e = sequence();
         mustConsume(RIGHT_PAREN, "Expected ')' after expression.");
-
         yield new Expr.Grouping(e);
       }
+      case IDENTIFIER -> new Expr.Variable(previous());
       default -> throw error(previous(), "Expected expression.");
     };
   }

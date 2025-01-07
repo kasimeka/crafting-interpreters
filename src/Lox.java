@@ -19,47 +19,48 @@ public class Lox {
       runFile(args[0]);
     } else {
       runPrompt();
-      System.out.println("\ngoodbye fren :)");
+      System.out.println("\ngoodbye :)");
     }
-  }
-
-  private static void runFile(String path) throws IOException {
-    final var bytes = Files.readAllBytes(Paths.get(path));
-    run(new String(bytes, Charset.defaultCharset()));
-    if (hadError) System.exit(65);
-    if (hadRuntimeError) System.exit(70);
   }
 
   private static void runPrompt() throws IOException {
     final var input = new InputStreamReader(System.in);
     final var reader = new BufferedReader(input);
+    final var printer = new AstPrinter();
+    final var interpreter = new Interpreter();
 
+    int braces = 0;
     while (true) {
       System.out.print(">>> ");
-      final var line = reader.readLine();
+      var line = reader.readLine();
       if (line == null) break;
-      run(line);
+
+      final var scanner = new Scanner(line);
+      final var tokens = scanner.scanTokens();
+
+      final var parser = new Parser(tokens);
+      final var stmts = parser.parse();
+      if (!hadError) {
+        System.out.println(printer.print(stmts));
+        interpreter.repl(stmts);
+      }
       hadError = false;
       hadRuntimeError = false;
     }
   }
 
-  private static void run(String source) {
-    final var scanner = new Scanner(source);
+  private static void runFile(String path) throws IOException {
+    final var bytes = Files.readAllBytes(Paths.get(path));
+
+    final var scanner = new Scanner(new String(bytes, Charset.defaultCharset()));
     final var tokens = scanner.scanTokens();
 
     final var parser = new Parser(tokens);
-    final var expr = parser.parse(); // we're doing only one expression
-    if (hadError) return;
+    final var stmts = parser.parse(); // we're doing only one expression
+    if (hadError) System.exit(65);
 
-    final var printer = new AstPrinter();
-    System.out.println(printer.print(expr));
-
-    final var interpreter = new Interpreter();
-    final var value = interpreter.interpret(expr);
-    if (hadRuntimeError) return;
-
-    System.out.println("--> " + value);
+    (new Interpreter()).interpret(stmts);
+    if (hadRuntimeError) System.exit(70);
   }
 
   static void runtimeError(Interpreter.RuntimeError error) {
@@ -75,7 +76,7 @@ public class Lox {
     if (token.kind() == TokenKind.EOF) {
       report(token.line(), " at end", message);
     } else {
-      report(token.line(), " at '" + token.lexeme() + "'", message);
+      report(token.line(), " at `" + token.lexeme() + "`", message);
     }
   }
 
