@@ -64,7 +64,8 @@ class Parser {
   }
 
   private Stmt forStatement() {
-    // mustConsume(LEFT_PAREN, "Expected '(' after `for`.");
+    final var parens = tryConsume(LEFT_PAREN);
+
     final var initializer =
         tryConsume(SEMICOLON)
             ? Optional.<Stmt>empty()
@@ -73,8 +74,12 @@ class Parser {
     final var condition = nextIs(SEMICOLON) ? new Expr.Literal(true) : expression();
     mustConsume(SEMICOLON, "Expected ';' after loop condition.");
 
-    final var increment = nextIs(LEFT_BRACE) ? Optional.<Expr>empty() : Optional.of(expression());
-    // mustConsume(RIGHT_PAREN, "Expect ')' after for clauses.");
+    final var increment =
+        parens && nextIs(RIGHT_PAREN) || nextIs(LEFT_BRACE)
+            ? Optional.<Expr>empty()
+            : Optional.of(expression());
+
+    if (parens) mustConsume(RIGHT_PAREN, "Unterminated '(' in for clauses.");
 
     final var body = block("Expected '{' after for clauses.", true);
     final var iterations =
