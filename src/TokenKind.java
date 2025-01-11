@@ -37,7 +37,6 @@ enum TokenKind {
   ELSE,
   FALSE,
   FUN,
-  FOR,
   IF,
   IFX,
   // THEN,
@@ -49,7 +48,9 @@ enum TokenKind {
   THIS,
   TRUE,
   VAR,
+  FOR,
   WHILE,
+  BREAK,
 
   ERROR,
   EOF

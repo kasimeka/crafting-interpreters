@@ -9,6 +9,8 @@ public interface Stmt { // extends Grammar
   interface Visitor<R> { // extends Grammar.Visitor<R>
     R visitBlockStmt(Block expr);
 
+    R visitBreakStmt(Break expr);
+
     R visitExpressionStmt(Expression expr);
 
     R visitIfStmt(If expr);
@@ -20,10 +22,17 @@ public interface Stmt { // extends Grammar
     R visitWhileStmt(While expr);
   }
 
-  record Block(List<Stmt> statements) implements Stmt {
+  record Block(List<Stmt> statements, boolean enclosedInLoop) implements Stmt {
     @Override
     public <R> R accept(Visitor<R> visitor) {
       return visitor.visitBlockStmt(this);
+    }
+  }
+
+  record Break() implements Stmt {
+    @Override
+    public <R> R accept(Visitor<R> visitor) {
+      return visitor.visitBreakStmt(this);
     }
   }
 

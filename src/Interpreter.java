@@ -9,6 +9,7 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
   boolean isRepl;
   private final AstPrinter printer = new AstPrinter();
   private Environment environment = new Environment();
+  private boolean unwindingLoop = false;
 
   Interpreter() {
     this.isRepl = false;
@@ -210,7 +211,18 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
   }
 
   @Override
+  public Void visitWhileStmt(Stmt.While stmt) {
+    while (isTruthy(evaluate(stmt.condition()))) {
+      execute(stmt.body());
+      if (unwindingLoop) return null;
+    }
+    return null;
+  }
+
+  @Override
   public Void visitBlockStmt(Stmt.Block stmt) {
+    if (!stmt.enclosedInLoop()) unwindingLoop = false;
+    if (unwindingLoop) return null;
     executeBlock(stmt.statements(), new Environment(environment));
     return null;
   }
@@ -220,6 +232,7 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     try {
       this.environment = environment;
       for (Stmt statement : statements) {
+        if (unwindingLoop) break;
         execute(statement);
       }
     } finally {
@@ -238,10 +251,8 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
   }
 
   @Override
-  public Void visitWhileStmt(Stmt.While stmt) {
-    while (isTruthy(evaluate(stmt.condition()))) {
-      execute(stmt.body());
-    }
+  public Void visitBreakStmt(Stmt.Break stmt) {
+    unwindingLoop = true;
     return null;
   }
 }

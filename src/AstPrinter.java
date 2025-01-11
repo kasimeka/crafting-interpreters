@@ -59,10 +59,10 @@ class AstPrinter implements Expr.Visitor<String>, Stmt.Visitor<String> {
   public String visitLiteralExpr(Expr.Literal expr) {
     final var v = expr.value();
     return switch (v) {
+      case null -> "'nil";
+      case ERROR -> "'" + v.toString();
       case Boolean b -> "'" + b.toString();
       // case Parser.ParseError e -> "[" + e.token.toString() + "]";
-      case ERROR -> "'" + v.toString();
-      case null -> "'nil";
       default -> "«" + v.toString() + "»";
     };
   }
@@ -123,5 +123,10 @@ class AstPrinter implements Expr.Visitor<String>, Stmt.Visitor<String> {
   @Override
   public String visitWhileStmt(Stmt.While stmt) {
     return "(while " + print(stmt.condition()) + " " + print(stmt.body().statements());
+  }
+
+  @Override
+  public String visitBreakStmt(Stmt.Break expr) {
+    return renderTree("break");
   }
 }

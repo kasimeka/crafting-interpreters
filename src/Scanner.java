@@ -162,6 +162,7 @@ class Scanner {
   private static final Map<String, TokenKind> keywords =
       Map.ofEntries(
           entry("and", AND),
+          entry("break", BREAK),
           entry("class", CLASS),
           entry("else", ELSE),
           entry("false", FALSE),

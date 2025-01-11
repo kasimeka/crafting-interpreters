@@ -26,14 +26,14 @@ class Parser {
   List<Stmt> parse() {
     final var statements = new ArrayList<Stmt>();
     while (!atEof()) {
-      statements.add(declaration());
+      statements.add(declaration(false));
     }
     return statements;
   }
 
-  private Stmt declaration() {
+  private Stmt declaration(boolean enclosedInLoop) {
     try {
-      return tryConsume(VAR) ? varDeclaration() : statement();
+      return tryConsume(VAR) ? varDeclaration() : statement(enclosedInLoop);
     } catch (ParseError _error) {
       // TODO: add Stmt subclass to represent parse errors
       recover();
@@ -49,12 +49,17 @@ class Parser {
     return new Stmt.Var(name, initializer);
   }
 
-  private Stmt statement() {
+  private Stmt statement(boolean enclosedInLoop) {
     if (tryConsume(FOR)) return forStatement();
-    if (tryConsume(IF)) return ifStatement();
+    if (tryConsume(IF)) return ifStatement(enclosedInLoop);
     if (tryConsume(WHILE)) return whileStatement();
     if (tryConsume(PRINT)) return printStatement();
-    if (nextIs(LEFT_BRACE)) return block("impossible :)");
+    if (tryConsume(BREAK)) {
+      if (!enclosedInLoop) throw error(current(), "Unexpected `break` outside of loop.");
+      mustConsume(SEMICOLON, "Expected ';' after break statement.");
+      return new Stmt.Break();
+    }
+    if (nextIs(LEFT_BRACE)) return block("impossible :)", enclosedInLoop);
     return expressionStatement();
   }
 
@@ -71,27 +76,30 @@ class Parser {
     final var increment = nextIs(LEFT_BRACE) ? Optional.<Expr>empty() : Optional.of(expression());
     // mustConsume(RIGHT_PAREN, "Expect ')' after for clauses.");
 
-    final var body = block("Expected '{' after for clauses.").statements();
-    increment.ifPresent(e -> body.add(new Stmt.Expression(e)));
-
-    final var iterations = new Stmt.While(condition, new Stmt.Block(body));
+    final var body = block("Expected '{' after for clauses.", true);
+    final var iterations =
+        new Stmt.While(
+            condition,
+            increment
+                .map(e -> new Stmt.Block(Arrays.asList(body, new Stmt.Expression(e)), true))
+                .orElse(body));
     return initializer
-        .<Stmt>map(init -> new Stmt.Block(Arrays.asList(init, iterations)))
+        .<Stmt>map(init -> new Stmt.Block(Arrays.asList(init, iterations), true))
         .orElse(iterations);
   }
 
   private Stmt whileStatement() {
-    return new Stmt.While(expression(), block("Expected '{' after while condition."));
+    return new Stmt.While(expression(), block("Expected '{' after while condition.", true));
   }
 
-  private Stmt ifStatement() {
+  private Stmt ifStatement(boolean enclosedInLoop) {
     final var condition = expression();
 
-    final var thenBranch = block("Expected '{' after if condition.");
+    final var thenBranch = block("Expected '{' after if condition.", enclosedInLoop);
 
     var elseBranch = Optional.<Stmt.Block>empty();
     if (tryConsume(ELSE)) {
-      elseBranch = Optional.of(block("Expected '{' after `else`."));
+      elseBranch = Optional.of(block("Expected '{' after `else`.", enclosedInLoop));
     }
 
     return new Stmt.If(condition, thenBranch, elseBranch);
@@ -109,14 +117,14 @@ class Parser {
     return new Stmt.Expression(expr);
   }
 
-  private Stmt.Block block(String errMsg) {
+  private Stmt.Block block(String errMsg, boolean enclosedInLoop) {
     mustConsume(LEFT_BRACE, errMsg);
     final var statements = new ArrayList<Stmt>();
     while (!nextIs(RIGHT_BRACE) && !atEof()) {
-      statements.add(declaration()); // drop errors
+      statements.add(declaration(enclosedInLoop)); // drop errors
     }
     mustConsume(RIGHT_BRACE, "Expected '}' after block.");
-    return new Stmt.Block(statements);
+    return new Stmt.Block(statements, enclosedInLoop);
   }
 
   private Expr ifExpression() {
