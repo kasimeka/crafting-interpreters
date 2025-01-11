@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Optional;
 
 class Parser {
-  static final class ParseError extends RuntimeException {
+  final class ParseError extends RuntimeException {
     final Token token;
 
     ParseError(Token token) {

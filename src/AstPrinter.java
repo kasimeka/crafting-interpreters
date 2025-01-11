@@ -60,7 +60,7 @@ class AstPrinter implements Expr.Visitor<String>, Stmt.Visitor<String> {
     final var v = expr.value();
     return switch (v) {
       case Boolean b -> "'" + b.toString();
-      case Parser.ParseError e -> "[" + e.token.toString() + "]";
+      // case Parser.ParseError e -> "[" + e.token.toString() + "]";
       case ERROR -> "'" + v.toString();
       case null -> "'nil";
       default -> "«" + v.toString() + "»";
