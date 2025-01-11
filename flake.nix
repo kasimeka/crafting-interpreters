@@ -44,7 +44,8 @@
               Var = "Token name, Expr initializer";
               If = " Expr condition, Stmt.Block thenBranch, Optional<Stmt.Block> elseBranch";
               While = "Expr condition, Stmt.Block body";
-              Break = ""; # TODO:
+              Break = "";
+              Continue = "";
             };
           }
         ];

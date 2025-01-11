@@ -11,6 +11,8 @@ public interface Stmt { // extends Grammar
 
     R visitBreakStmt(Break expr);
 
+    R visitContinueStmt(Continue expr);
+
     R visitExpressionStmt(Expression expr);
 
     R visitIfStmt(If expr);
@@ -33,6 +35,13 @@ public interface Stmt { // extends Grammar
     @Override
     public <R> R accept(Visitor<R> visitor) {
       return visitor.visitBreakStmt(this);
+    }
+  }
+
+  record Continue() implements Stmt {
+    @Override
+    public <R> R accept(Visitor<R> visitor) {
+      return visitor.visitContinueStmt(this);
     }
   }
 

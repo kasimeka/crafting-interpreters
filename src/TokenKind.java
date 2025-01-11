@@ -51,6 +51,7 @@ enum TokenKind {
   FOR,
   WHILE,
   BREAK,
+  CONTINUE,
 
   ERROR,
   EOF

@@ -59,6 +59,11 @@ class Parser {
       mustConsume(SEMICOLON, "Expected ';' after break statement.");
       return new Stmt.Break();
     }
+    if (tryConsume(CONTINUE)) {
+      if (!enclosedInLoop) throw error(current(), "Unexpected `continue` outside of loop.");
+      mustConsume(SEMICOLON, "Expected ';' after continue statement.");
+      return new Stmt.Continue();
+    }
     if (nextIs(LEFT_BRACE)) return block("impossible :)", enclosedInLoop);
     return expressionStatement();
   }

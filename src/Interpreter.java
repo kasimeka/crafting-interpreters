@@ -255,4 +255,9 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     unwindingLoop = true;
     return null;
   }
+
+  @Override
+  public Void visitContinueStmt(Stmt.Continue expr) {
+    return null; // TODO:
+  }
 }

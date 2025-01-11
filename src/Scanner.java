@@ -164,6 +164,7 @@ class Scanner {
           entry("and", AND),
           entry("break", BREAK),
           entry("class", CLASS),
+          entry("continue", CONTINUE),
           entry("else", ELSE),
           entry("false", FALSE),
           entry("for", FOR),

@@ -129,4 +129,9 @@ class AstPrinter implements Expr.Visitor<String>, Stmt.Visitor<String> {
   public String visitBreakStmt(Stmt.Break expr) {
     return renderTree("break");
   }
+
+  @Override
+  public String visitContinueStmt(Stmt.Continue expr) {
+    return renderTree("continue");
+  }
 }
