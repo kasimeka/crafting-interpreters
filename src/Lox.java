@@ -27,9 +27,8 @@ public class Lox {
     final var input = new InputStreamReader(System.in);
     final var reader = new BufferedReader(input);
     final var printer = new AstPrinter();
-    final var interpreter = new Interpreter();
+    final var repl = new Interpreter(true); // isRepl
 
-    int braces = 0;
     while (true) {
       System.out.print(">>> ");
       var line = reader.readLine();
@@ -40,10 +39,8 @@ public class Lox {
 
       final var parser = new Parser(tokens);
       final var stmts = parser.parse();
-      if (!hadError) {
-        System.out.println(printer.print(stmts));
-        interpreter.repl(stmts);
-      }
+      System.out.println(printer.print(stmts));
+      if (!hadError) repl.interpret(stmts);
       hadError = false;
       hadRuntimeError = false;
     }

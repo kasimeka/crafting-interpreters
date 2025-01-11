@@ -42,8 +42,8 @@ class Scanner {
       case '-' -> addToken(MINUS);
       case '+' -> addToken(PLUS);
       case '*' -> addToken(STAR);
-      case '?' -> addToken(QUESTION_MARK);
-      case ':' -> addToken(COLON);
+      // case '?' -> addToken(QUESTION_MARK);
+      // case ':' -> addToken(COLON);
       case '!' -> addToken(consumeChar('=') ? BANG_EQUAL : BANG);
       case '=' -> addToken(consumeChar('=') ? EQUAL_EQUAL : EQUAL);
       case '<' -> addToken(consumeChar('=') ? LESS_EQUAL : LESS);
@@ -168,11 +168,13 @@ class Scanner {
           entry("for", FOR),
           entry("fun", FUN),
           entry("if", IF),
+          entry("ifx", IFX),
           entry("nil", NIL),
           entry("or", OR),
           entry("print", PRINT),
           entry("return", RETURN),
           entry("super", SUPER),
+          // entry("then", THEN),
           entry("this", THIS),
           entry("true", TRUE),
           entry("var", VAR),

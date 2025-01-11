@@ -24,23 +24,26 @@
           {
             name = "Expr";
             records = {
+              Logical = "Expr left, Token operator, Expr right";
               Binary = "Expr left, Token operator, Expr right";
               Unary = "Token operator, Expr right";
               Grouping = "Expr expression";
               Literal = "Object value";
-              Ternary = "Expr condition, Expr first, Expr second";
+              If = "Expr condition, Expr first, Expr second";
               Variable = "Token name";
               Assign = "Token name, Expr value";
             };
           }
           {
             name = "Stmt";
-            imports = ["java.util.List"];
+            imports = ["java.util.List" "java.util.Optional"];
             records = {
               Block = "List<Stmt> statements";
               Expression = "Expr expression";
               Print = "Expr expression";
               Var = "Token name, Expr initializer";
+              If = " Expr condition, Stmt.Block thenBranch, Optional<Stmt.Block> elseBranch";
+              While = "Expr condition, Stmt.Block body";
             };
           }
         ];

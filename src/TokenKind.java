@@ -13,8 +13,8 @@ enum TokenKind {
   SEMICOLON,
   SLASH,
   STAR,
-  COLON,
-  QUESTION_MARK,
+  // QUESTION_MARK,
+  // COLON,
 
   // One or two character tokens.
   BANG,
@@ -39,6 +39,8 @@ enum TokenKind {
   FUN,
   FOR,
   IF,
+  IFX,
+  // THEN,
   NIL,
   OR,
   PRINT,

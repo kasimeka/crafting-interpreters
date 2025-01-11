@@ -1,18 +1,23 @@
 package com.craftinginterpreters.lox;
 
 import java.util.List;
+import java.util.Optional;
 
-public interface Stmt {
+public interface Stmt { // extends Grammar
   abstract <R> R accept(Visitor<R> visitor);
 
-  interface Visitor<R> {
+  interface Visitor<R> { // extends Grammar.Visitor<R>
     R visitBlockStmt(Block expr);
 
     R visitExpressionStmt(Expression expr);
 
+    R visitIfStmt(If expr);
+
     R visitPrintStmt(Print expr);
 
     R visitVarStmt(Var expr);
+
+    R visitWhileStmt(While expr);
   }
 
   record Block(List<Stmt> statements) implements Stmt {
@@ -29,6 +34,14 @@ public interface Stmt {
     }
   }
 
+  record If(Expr condition, Stmt.Block thenBranch, Optional<Stmt.Block> elseBranch)
+      implements Stmt {
+    @Override
+    public <R> R accept(Visitor<R> visitor) {
+      return visitor.visitIfStmt(this);
+    }
+  }
+
   record Print(Expr expression) implements Stmt {
     @Override
     public <R> R accept(Visitor<R> visitor) {
@@ -40,6 +53,13 @@ public interface Stmt {
     @Override
     public <R> R accept(Visitor<R> visitor) {
       return visitor.visitVarStmt(this);
+    }
+  }
+
+  record While(Expr condition, Stmt.Block body) implements Stmt {
+    @Override
+    public <R> R accept(Visitor<R> visitor) {
+      return visitor.visitWhileStmt(this);
     }
   }
 }

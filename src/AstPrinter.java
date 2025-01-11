@@ -1,5 +1,7 @@
 package com.craftinginterpreters.lox;
 
+import static com.craftinginterpreters.lox.TokenKind.ERROR;
+
 import java.util.List;
 import java.util.Optional;
 
@@ -39,6 +41,11 @@ class AstPrinter implements Expr.Visitor<String>, Stmt.Visitor<String> {
   }
 
   @Override
+  public String visitLogicalExpr(Expr.Logical expr) {
+    return renderTree(expr.operator().lexeme(), expr.left(), expr.right());
+  }
+
+  @Override
   public String visitBinaryExpr(Expr.Binary expr) {
     return renderTree(expr.operator().lexeme(), expr.left(), expr.right());
   }
@@ -51,8 +58,13 @@ class AstPrinter implements Expr.Visitor<String>, Stmt.Visitor<String> {
   @Override
   public String visitLiteralExpr(Expr.Literal expr) {
     final var v = expr.value();
-    if (v == null) return "nil";
-    return "«" + v.toString() + "»";
+    return switch (v) {
+      case Boolean b -> "'" + b.toString();
+      case Parser.ParseError e -> "[" + e.token.toString() + "]";
+      case ERROR -> "'" + v.toString();
+      case null -> "'nil";
+      default -> "«" + v.toString() + "»";
+    };
   }
 
   @Override
@@ -61,8 +73,8 @@ class AstPrinter implements Expr.Visitor<String>, Stmt.Visitor<String> {
   }
 
   @Override
-  public String visitTernaryExpr(Expr.Ternary expr) {
-    return renderTree("if", expr.condition(), expr.first(), expr.second());
+  public String visitIfExpr(Expr.If expr) {
+    return renderTree("ifx", expr.condition(), expr.first(), expr.second());
   }
 
   @Override
@@ -96,5 +108,20 @@ class AstPrinter implements Expr.Visitor<String>, Stmt.Visitor<String> {
   @Override
   public String visitBlockStmt(Stmt.Block stmt) {
     return print(stmt.statements());
+  }
+
+  @Override
+  public String visitIfStmt(Stmt.If stmt) {
+    return "(if "
+        + print(stmt.condition())
+        + " "
+        + print(stmt.thenBranch())
+        + stmt.elseBranch().map(s -> " " + print(s)).orElse("")
+        + ")";
+  }
+
+  @Override
+  public String visitWhileStmt(Stmt.While stmt) {
+    return "(while " + print(stmt.condition()) + " " + print(stmt.body().statements());
   }
 }

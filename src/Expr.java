@@ -1,18 +1,20 @@
 package com.craftinginterpreters.lox;
 
-public interface Expr {
+public interface Expr { // extends Grammar
   abstract <R> R accept(Visitor<R> visitor);
 
-  interface Visitor<R> {
+  interface Visitor<R> { // extends Grammar.Visitor<R>
     R visitAssignExpr(Assign expr);
 
     R visitBinaryExpr(Binary expr);
 
     R visitGroupingExpr(Grouping expr);
 
+    R visitIfExpr(If expr);
+
     R visitLiteralExpr(Literal expr);
 
-    R visitTernaryExpr(Ternary expr);
+    R visitLogicalExpr(Logical expr);
 
     R visitUnaryExpr(Unary expr);
 
@@ -40,6 +42,13 @@ public interface Expr {
     }
   }
 
+  record If(Expr condition, Expr first, Expr second) implements Expr {
+    @Override
+    public <R> R accept(Visitor<R> visitor) {
+      return visitor.visitIfExpr(this);
+    }
+  }
+
   record Literal(Object value) implements Expr {
     @Override
     public <R> R accept(Visitor<R> visitor) {
@@ -47,10 +56,10 @@ public interface Expr {
     }
   }
 
-  record Ternary(Expr condition, Expr first, Expr second) implements Expr {
+  record Logical(Expr left, Token operator, Expr right) implements Expr {
     @Override
     public <R> R accept(Visitor<R> visitor) {
-      return visitor.visitTernaryExpr(this);
+      return visitor.visitLogicalExpr(this);
     }
   }
 

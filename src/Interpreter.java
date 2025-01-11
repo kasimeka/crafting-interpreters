@@ -1,40 +1,29 @@
 package com.craftinginterpreters.lox;
 
+import static janw4ld.utils.Utils.supply;
+
 import java.util.List;
 import java.util.Optional;
 
 class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
-  private static final AstPrinter printer = new AstPrinter();
+  boolean isRepl;
+  private final AstPrinter printer = new AstPrinter();
   private Environment environment = new Environment();
 
-  static class RuntimeError extends RuntimeException {
+  Interpreter() {
+    this.isRepl = false;
+  }
+
+  Interpreter(boolean isRepl) {
+    this.isRepl = isRepl;
+  }
+
+  class RuntimeError extends RuntimeException {
     final Token token;
 
     RuntimeError(Expr expr, Token token, String message) {
       super(Optional.ofNullable(expr).map(e -> printer.print(e) + ": ").orElse("") + message);
       this.token = token;
-    }
-  }
-
-  void repl(List<Stmt> statements) {
-    repl(statements, this.environment);
-  }
-
-  void repl(List<Stmt> statements, Environment environment) {
-    final var previous = this.environment;
-    try {
-      this.environment = environment;
-      for (Stmt stmt : statements) {
-        switch (stmt) {
-          case Stmt.Block b -> repl(b.statements(), new Environment(environment));
-          case Stmt.Expression e -> execute(new Stmt.Print(e.expression()));
-          default -> execute(stmt);
-        }
-      }
-    } catch (RuntimeError error) {
-      Lox.runtimeError(error);
-    } finally {
-      this.environment = previous;
     }
   }
 
@@ -70,7 +59,12 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
   @Override
   public Void visitExpressionStmt(Stmt.Expression stmt) {
-    evaluate(stmt.expression());
+    final var e = stmt.expression();
+    if (isRepl) {
+      execute(new Stmt.Print(e));
+    } else {
+      evaluate(e);
+    }
     return null;
   }
 
@@ -118,9 +112,22 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
   }
 
   @Override
+  public Object visitLogicalExpr(Expr.Logical expr) {
+    final var left = evaluate(expr.left());
+    switch (expr.operator().kind()) {
+      case TokenKind.OR -> {
+        if (isTruthy(left)) return left;
+      }
+      case TokenKind.AND -> {
+        if (!isTruthy(left)) return left;
+      }
+    }
+    return evaluate(expr.right());
+  }
+
+  @Override
   public Object visitBinaryExpr(Expr.Binary expr) {
     final var operator = expr.operator();
-    // can't short circuit boolean operators
     final var left = evaluate(expr.left());
     final var right = evaluate(expr.right());
 
@@ -157,19 +164,18 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
   }
 
   @Override
-  public Object visitTernaryExpr(Expr.Ternary expr) {
-    return isTruthy(expr.condition()) ? evaluate(expr.first()) : evaluate(expr.second());
+  public Object visitIfExpr(Expr.If expr) {
+    return isTruthy(evaluate(expr.condition())) ? evaluate(expr.first()) : evaluate(expr.second());
   }
 
   @Override
   public Object visitVariableExpr(Expr.Variable expr) {
     final var name = expr.name();
     final var key = name.lexeme();
-
     return environment
         .get(key)
         .orElseThrow(
-            () -> new RuntimeError(expr, name, "Variable `" + key + "` used before assignment"));
+            supply(new RuntimeError(expr, name, "Variable `" + key + "` used before assignment")));
   }
 
   @Override
@@ -219,5 +225,23 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     } finally {
       this.environment = previous;
     }
+  }
+
+  @Override
+  public Void visitIfStmt(Stmt.If stmt) {
+    if (isTruthy(evaluate(stmt.condition()))) {
+      execute(stmt.thenBranch());
+    } else {
+      stmt.elseBranch().ifPresent(this::execute);
+    }
+    return null;
+  }
+
+  @Override
+  public Void visitWhileStmt(Stmt.While stmt) {
+    while (isTruthy(evaluate(stmt.condition()))) {
+      execute(stmt.body());
+    }
+    return null;
   }
 }
