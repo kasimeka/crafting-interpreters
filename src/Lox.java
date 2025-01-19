@@ -27,18 +27,20 @@ public class Lox {
     final var input = new InputStreamReader(System.in);
     final var reader = new BufferedReader(input);
     final var printer = new AstPrinter();
-    final var repl = new Interpreter(true); // isRepl
+    final var repl = new Interpreter(/* isRepl: */ true);
 
     while (true) {
       System.out.print(">>> ");
       var line = reader.readLine();
-      if (line == null) break;
+      if (line == null) break; // user pressed ctrl+d
 
       final var scanner = new Scanner(line);
       final var tokens = scanner.scanTokens();
 
       final var parser = new Parser(tokens);
       final var stmts = parser.parse();
+      if (stmts.size() < 1) continue;
+
       System.out.println(printer.print(stmts));
       if (!hadError) repl.interpret(stmts);
       hadError = false;
@@ -56,7 +58,7 @@ public class Lox {
     final var stmts = parser.parse(); // we're doing only one expression
     if (hadError) System.exit(65);
 
-    (new Interpreter()).interpret(stmts);
+    (new Interpreter(/* isRepl: */ false)).interpret(stmts);
     if (hadRuntimeError) System.exit(70);
   }
 

@@ -3,7 +3,6 @@ package com.craftinginterpreters.lox;
 import static com.craftinginterpreters.lox.TokenKind.ERROR;
 
 import java.util.List;
-import java.util.Optional;
 
 class AstPrinter implements Expr.Visitor<String>, Stmt.Visitor<String> {
   int depth = 0;
@@ -17,6 +16,7 @@ class AstPrinter implements Expr.Visitor<String>, Stmt.Visitor<String> {
   }
 
   String print(List<Stmt> stmts) {
+    if (stmts.size() < 1) return "()";
     final var shouldNest = stmts.size() != 1;
     if (shouldNest) depth += 1;
     final var in = "  ".repeat(depth);
@@ -32,7 +32,7 @@ class AstPrinter implements Expr.Visitor<String>, Stmt.Visitor<String> {
     final var builder = new StringBuilder();
 
     builder.append("(").append(name);
-    for (Expr expr : exprs) {
+    for (var expr : exprs) {
       builder.append(" ").append(print(expr));
     }
     builder.append(")");
@@ -68,6 +68,11 @@ class AstPrinter implements Expr.Visitor<String>, Stmt.Visitor<String> {
   }
 
   @Override
+  public String visitCallExpr(Expr.Call expr) {
+    return renderTree("^" + print(expr.callee()), expr.arguments().toArray(Expr[]::new));
+  }
+
+  @Override
   public String visitUnaryExpr(Expr.Unary expr) {
     return renderTree(expr.operator().lexeme(), expr.right());
   }
@@ -80,6 +85,17 @@ class AstPrinter implements Expr.Visitor<String>, Stmt.Visitor<String> {
   @Override
   public String visitVariableExpr(Expr.Variable expr) {
     return expr.name().lexeme();
+  }
+
+  @Override
+  public String visitFunctionExpr(Expr.Function expr) {
+    final var params = String.join(" '", expr.params().stream().map(Token::lexeme).toList());
+    return "(("
+        + (params.length() > 0 ? "params '" + params : "")
+        + ")"
+        + " '"
+        + print(expr.body())
+        + ")";
   }
 
   @Override
@@ -100,9 +116,7 @@ class AstPrinter implements Expr.Visitor<String>, Stmt.Visitor<String> {
   @Override
   public String visitVarStmt(Stmt.Var stmt) {
     final var decl = "declare '" + stmt.name().lexeme();
-    return Optional.ofNullable(stmt.initializer())
-        .map(i -> renderTree(decl, i))
-        .orElse(renderTree(decl));
+    return stmt.initializer().map(i -> renderTree(decl, i)).orElse(renderTree(decl));
   }
 
   @Override
@@ -128,5 +142,15 @@ class AstPrinter implements Expr.Visitor<String>, Stmt.Visitor<String> {
   @Override
   public String visitBreakStmt(Stmt.Break expr) {
     return renderTree("break");
+  }
+
+  @Override
+  public String visitReturnStmt(Stmt.Return stmt) {
+    return stmt.value().map(v -> renderTree("return", v)).orElse(renderTree("return"));
+  }
+
+  @Override
+  public String visitFunctionStmt(Stmt.Function stmt) {
+    return "(declare '" + stmt.name().lexeme() + " " + print(stmt.definition()) + ")";
   }
 }

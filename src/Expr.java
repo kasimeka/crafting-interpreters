@@ -1,5 +1,7 @@
 package com.craftinginterpreters.lox;
 
+import java.util.List;
+
 public interface Expr { // extends Grammar
   abstract <R> R accept(Visitor<R> visitor);
 
@@ -7,6 +9,10 @@ public interface Expr { // extends Grammar
     R visitAssignExpr(Assign expr);
 
     R visitBinaryExpr(Binary expr);
+
+    R visitCallExpr(Call expr);
+
+    R visitFunctionExpr(Function expr);
 
     R visitGroupingExpr(Grouping expr);
 
@@ -32,6 +38,20 @@ public interface Expr { // extends Grammar
     @Override
     public <R> R accept(Visitor<R> visitor) {
       return visitor.visitBinaryExpr(this);
+    }
+  }
+
+  record Call(Expr callee, Token paren, List<Expr> arguments) implements Expr {
+    @Override
+    public <R> R accept(Visitor<R> visitor) {
+      return visitor.visitCallExpr(this);
+    }
+  }
+
+  record Function(List<Token> params, Stmt.Block body) implements Expr {
+    @Override
+    public <R> R accept(Visitor<R> visitor) {
+      return visitor.visitFunctionExpr(this);
     }
   }
 

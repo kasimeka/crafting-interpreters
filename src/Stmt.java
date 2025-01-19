@@ -13,9 +13,13 @@ public interface Stmt { // extends Grammar
 
     R visitExpressionStmt(Expression expr);
 
+    R visitFunctionStmt(Function expr);
+
     R visitIfStmt(If expr);
 
     R visitPrintStmt(Print expr);
+
+    R visitReturnStmt(Return expr);
 
     R visitVarStmt(Var expr);
 
@@ -43,6 +47,13 @@ public interface Stmt { // extends Grammar
     }
   }
 
+  record Function(Token name, Expr.Function definition) implements Stmt {
+    @Override
+    public <R> R accept(Visitor<R> visitor) {
+      return visitor.visitFunctionStmt(this);
+    }
+  }
+
   record If(Expr condition, Stmt.Block thenBranch, Optional<Stmt.Block> elseBranch)
       implements Stmt {
     @Override
@@ -58,7 +69,14 @@ public interface Stmt { // extends Grammar
     }
   }
 
-  record Var(Token name, Expr initializer) implements Stmt {
+  record Return(Token keyword, Optional<Expr> value) implements Stmt {
+    @Override
+    public <R> R accept(Visitor<R> visitor) {
+      return visitor.visitReturnStmt(this);
+    }
+  }
+
+  record Var(Token name, Optional<Expr> initializer) implements Stmt {
     @Override
     public <R> R accept(Visitor<R> visitor) {
       return visitor.visitVarStmt(this);

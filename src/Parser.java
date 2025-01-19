@@ -33,7 +33,9 @@ class Parser {
 
   private Stmt declaration(boolean enclosedInLoop) {
     try {
-      return tryConsume(VAR) ? varDeclaration() : statement(enclosedInLoop);
+      if (tryConsume(FUN)) return function();
+      if (tryConsume(VAR)) return varDeclaration();
+      return statement(enclosedInLoop);
     } catch (ParseError _error) {
       // TODO: add Stmt subclass to represent parse errors
       recover();
@@ -41,10 +43,21 @@ class Parser {
     }
   }
 
+  private Stmt function() {
+    if (!tryConsume(IDENTIFIER)) {
+      final var e = functionExpr();
+      mustConsume(SEMICOLON, "Expected ';' after expression.");
+      return new Stmt.Expression(e);
+    }
+    final var name = current();
+    return new Stmt.Function(name, functionExpr());
+  }
+
   private Stmt varDeclaration() {
     mustConsume(IDENTIFIER, "Expected variable name.");
     final var name = current();
-    final var initializer = tryConsume(EQUAL) ? ifExpression() : null;
+    final var initializer =
+        tryConsume(EQUAL) ? Optional.of(ifExpression()) : Optional.<Expr>empty();
     mustConsume(SEMICOLON, "Expected ';' after variable declaration.");
     return new Stmt.Var(name, initializer);
   }
@@ -54,6 +67,7 @@ class Parser {
     if (tryConsume(IF)) return ifStatement(enclosedInLoop);
     if (tryConsume(WHILE)) return whileStatement();
     if (tryConsume(PRINT)) return printStatement();
+    if (tryConsume(RETURN)) return returnStatement();
     if (tryConsume(BREAK)) {
       if (!enclosedInLoop) throw error(current(), "Unexpected `break` outside of loop.");
       mustConsume(SEMICOLON, "Expected ';' after break statement.");
@@ -61,6 +75,13 @@ class Parser {
     }
     if (nextIs(LEFT_BRACE)) return block("impossible :)", enclosedInLoop);
     return expressionStatement();
+  }
+
+  private Stmt returnStatement() {
+    final var keyword = current();
+    final var value = nextIs(SEMICOLON) ? Optional.<Expr>empty() : Optional.of(expression());
+    mustConsume(SEMICOLON, "Expect ';' after return value.");
+    return new Stmt.Return(keyword, value);
   }
 
   private Stmt forStatement() {
@@ -160,7 +181,23 @@ class Parser {
   }
 
   private Expr expression() {
-    return assignment();
+    return tryConsume(FUN) ? functionExpr() : assignment();
+  }
+
+  private Expr.Function functionExpr() {
+    mustConsume(LEFT_PAREN, "Expect '(' after fun declaration.");
+    var parameters = new ArrayList<Token>();
+    if (!nextIs(RIGHT_PAREN)) {
+      do {
+        if (parameters.size() >= 255) {
+          error(peek(), "Can't have more than 255 parameters.");
+        }
+        mustConsume(IDENTIFIER, "Expect parameter name.");
+        parameters.add(current());
+      } while (tryConsume(COMMA));
+    }
+    mustConsume(RIGHT_PAREN, "Expect ')' after fun parameters.");
+    return new Expr.Function(parameters, block("Expect '{' before fun body.", false));
   }
 
   private Expr assignment() {
@@ -243,7 +280,26 @@ class Parser {
       final var right = unary();
       return new Expr.Unary(operator, right);
     }
-    return primary();
+    return call();
+  }
+
+  private Expr call() {
+    var expr = primary();
+    while (tryConsume(LEFT_PAREN)) {
+      final var arguments = new ArrayList<Expr>();
+      if (!nextIs(RIGHT_PAREN)) {
+        do {
+          if (arguments.size() >= 255) {
+            error(current(), "Can't have more than 255 arguments.");
+          }
+          arguments.add(expression());
+        } while (tryConsume(COMMA));
+      }
+      mustConsume(RIGHT_PAREN, "Expected ')' after arguments.");
+      final var paren = current();
+      expr = new Expr.Call(expr, paren, arguments);
+    }
+    return expr;
   }
 
   private Expr primary() {
@@ -278,7 +334,7 @@ class Parser {
   }
 
   private boolean tryConsume(TokenKind... kinds) {
-    for (final var k : kinds) {
+    for (var k : kinds) {
       if (nextIs(k)) {
         advance();
         return true;

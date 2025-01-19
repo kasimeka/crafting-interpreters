@@ -13,16 +13,21 @@
       system: let
         pkgs = import nixpkgs {
           inherit system;
-          overlays = [(_: _: {inherit jdk jre;})];
+          overlays = [
+            (_: _: {
+              jre = graalvmDrv;
+              jdk = graalvmDrv;
+              # jdk_headless = graalvmDrv;
+            })
+          ];
         };
-        jdk = pkgs.graalvmPackages.graalvm-ce-musl;
-        jre = pkgs.graalvmPackages.graalvm-ce-musl;
         graalvmDrv = pkgs.graalvmPackages.graalvm-ce-musl;
 
         generate-grammar-classes = (pkgs.callPackage
           ./hack/generate-grammar-classes.nix {}) [
           {
             name = "Expr";
+            imports = ["java.util.List" "java.util.Optional"];
             records = {
               Logical = "Expr left, Token operator, Expr right";
               Binary = "Expr left, Token operator, Expr right";
@@ -32,6 +37,8 @@
               If = "Expr condition, Expr first, Expr second";
               Variable = "Token name";
               Assign = "Token name, Expr value";
+              Call = "Expr callee, Token paren, List<Expr> arguments";
+              Function = "List<Token> params, Stmt.Block body";
             };
           }
           {
@@ -41,10 +48,12 @@
               Block = "List<Stmt> statements, boolean enclosedInLoop";
               Expression = "Expr expression";
               Print = "Expr expression";
-              Var = "Token name, Expr initializer";
+              Var = "Token name, Optional<Expr> initializer";
               If = " Expr condition, Stmt.Block thenBranch, Optional<Stmt.Block> elseBranch";
               While = "Expr condition, Stmt.Block body";
-              Break = ""; # TODO:
+              Break = "";
+              Return = "Token keyword, Optional<Expr> value";
+              Function = "Token name, Expr.Function definition";
             };
           }
         ];
@@ -61,23 +70,25 @@
           inherit pname version;
           src = ./src;
 
-          buildInputs = [jre];
-          nativeBuildInputs = [
-            jdk
-            pkgs.stripJavaArchivesHook
-            self.packages.${system}.generate-grammar-classes
-          ];
+          buildInputs = [pkgs.jre];
+          nativeBuildInputs =
+            [self.packages.${system}.generate-grammar-classes]
+            ++ (with pkgs; [
+              jdk
+              stripJavaArchivesHook
+            ]);
 
           buildPhase = ''
             install -Dm644 -t src $src/*
             ${pkgs.lib.getExe self.packages.${system}.generate-grammar-classes}
             find src -name '*.java' -type f -exec javac -d build/ {} +
+            (cd build && jar cvfe $out/share/java/${pname}.jar ${mainClass} *)
           '';
           installPhase = ''
-            (cd build && jar cvfe $out/share/java/${pname}.jar ${mainClass} *)
-            mkdir -p $out/bin && cat <<EOF > $out/bin/${pname}
+            mkdir -p $out/bin
+            cat <<EOF > $out/bin/${pname}
             #!usr/bin/env sh
-            JAVA_HOME=${jre} exec ${jre}/bin/java -jar $out/share/java/${pname}.jar "\$@"
+            JAVA_HOME=${pkgs.jre} exec ${pkgs.jre}/bin/java -jar $out/share/java/${pname}.jar "\$@"
             EOF
             chmod +x $out/bin/${pname}
           '';
@@ -94,9 +105,18 @@
         devShell = pkgs.mkShell {
           inputsFrom = [jar drv];
           packages = with pkgs; [
-            java-language-server
             google-java-format
             checkstyle
+            (java-language-server.overrideMavenAttrs (_: {
+              buildOffline = true;
+              mvnHash = "sha256-uQOGGhkHuTkpLTasYQY+TkJQ24mLEmSc7uPbQ4YOMK8=";
+              src = fetchFromGitHub {
+                owner = "nya3jp";
+                repo = "java-language-server";
+                rev = "526cdc1d2cd1a634d79d7d79504cb906de721247";
+                hash = "sha256-1zhVt6vgPjisWmDjCMxzLPhEozVld7B7rmOuvWkytQo=";
+              };
+            }))
           ];
           shellHook = ''echo "with love from wrd :)"'';
         };

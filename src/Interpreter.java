@@ -8,15 +8,31 @@ import java.util.Optional;
 class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
   boolean isRepl;
   private final AstPrinter printer = new AstPrinter();
-  private Environment environment = new Environment();
+  final Environment globals = new Environment();
+  private Environment environment = globals;
   private boolean unwindingLoop = false;
-
-  Interpreter() {
-    this.isRepl = false;
-  }
 
   Interpreter(boolean isRepl) {
     this.isRepl = isRepl;
+    globals.define(
+        "clock",
+        Optional.of(
+            new LoxCallable() {
+              @Override
+              public int arity() {
+                return 0;
+              }
+
+              @Override
+              public Object call(Interpreter _i, List<Object> _a) {
+                return (double) System.currentTimeMillis();
+              }
+
+              @Override
+              public String toString() {
+                return "<native java System.currentTimeMillis>";
+              }
+            }));
   }
 
   class RuntimeError extends RuntimeException {
@@ -26,11 +42,25 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
       super(Optional.ofNullable(expr).map(e -> printer.print(e) + ": ").orElse("") + message);
       this.token = token;
     }
+
+    RuntimeError(Token token, String message) {
+      super(message);
+      this.token = token;
+    }
+  }
+
+  class Return extends RuntimeException {
+    final Optional<Object> value;
+
+    Return(Optional<Object> value) {
+      super(null, null, false, false);
+      this.value = value;
+    }
   }
 
   void interpret(List<Stmt> statements) {
     try {
-      for (Stmt statement : statements) execute(statement);
+      for (var statement : statements) execute(statement);
     } catch (RuntimeError error) {
       Lox.runtimeError(error);
     }
@@ -59,6 +89,13 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
   }
 
   @Override
+  public Void visitFunctionStmt(Stmt.Function stmt) {
+    final var function = new LoxFunction(stmt, environment);
+    environment.define(stmt.name().lexeme(), Optional.of(function));
+    return null;
+  }
+
+  @Override
   public Void visitExpressionStmt(Stmt.Expression stmt) {
     final var e = stmt.expression();
     if (isRepl) {
@@ -77,8 +114,7 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
   @Override
   public Void visitVarStmt(Stmt.Var stmt) {
-    environment.define(
-        stmt.name().lexeme(), Optional.ofNullable(stmt.initializer()).map(this::evaluate));
+    environment.define(stmt.name().lexeme(), stmt.initializer().map(this::evaluate));
     return null;
   }
 
@@ -110,6 +146,22 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
         throw new RuntimeError(expr, operator, "unimplemented unary operator " + k.toString());
       }
     };
+  }
+
+  @Override
+  public Object visitCallExpr(Expr.Call expr) {
+    final var callee = evaluate(expr.callee());
+    final var arguments = expr.arguments().stream().map(this::evaluate).toList();
+
+    if (!(callee instanceof LoxCallable function)) {
+      throw new RuntimeError(expr.paren(), "Can only call functions and classes.");
+    }
+    if (arguments.size() != function.arity()) {
+      throw new RuntimeError(
+          expr.paren(),
+          "Expected " + function.arity() + " arguments but got " + arguments.size() + ".");
+    }
+    return function.call(this, arguments);
   }
 
   @Override
@@ -170,13 +222,19 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
   }
 
   @Override
+  public Object visitFunctionExpr(Expr.Function expr) {
+    return new AnonFunction(expr, environment);
+  }
+
+  @Override
   public Object visitVariableExpr(Expr.Variable expr) {
     final var name = expr.name();
     final var key = name.lexeme();
     return environment
         .get(key)
         .orElseThrow(
-            supply(new RuntimeError(expr, name, "Variable `" + key + "` used before assignment")));
+            supply(
+                new RuntimeError(expr, name, "Identifier `" + key + "` used before assignment")));
   }
 
   @Override
@@ -191,7 +249,7 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
   private boolean isTruthy(Object value) {
     if (value == null) return false; // null is a bitch in java :(
-    // the book only considers nil and false as falsey
+    // the book only considers nil and false as falsey, i'm adding zero too
     return !(value.equals(false) || value.equals(0.0));
   }
 
@@ -202,7 +260,7 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
   }
 
   private void checkOperands(Class<?> type, Expr expr, Token operator, Object... operands) {
-    for (Object operand : operands) {
+    for (var operand : operands) {
       if (!type.isInstance(operand)) {
         throw new RuntimeError(
             expr, operator, "Operands must be " + type.getSimpleName().toLowerCase() + "s.");
@@ -231,7 +289,7 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     final var previous = this.environment;
     try {
       this.environment = environment;
-      for (Stmt statement : statements) {
+      for (var statement : statements) {
         if (unwindingLoop) break;
         execute(statement);
       }
@@ -254,5 +312,10 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
   public Void visitBreakStmt(Stmt.Break stmt) {
     unwindingLoop = true;
     return null;
+  }
+
+  @Override
+  public Void visitReturnStmt(Stmt.Return stmt) {
+    throw new Return(stmt.value().map(this::evaluate));
   }
 }
