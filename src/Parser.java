@@ -310,7 +310,7 @@ class Parser {
       case NIL -> new Expr.Literal(null);
       case NUMBER, STRING -> new Expr.Literal(current().literal().get());
       case LEFT_PAREN -> {
-        final var e = sequence();
+        final var e = ifExpression();
         mustConsume(RIGHT_PAREN, "Expected ')' after expression.");
         yield new Expr.Grouping(e);
       }
