@@ -31,7 +31,7 @@ public class Lox {
 
     while (true) {
       System.out.print(">>> ");
-      var line = reader.readLine();
+      final var line = reader.readLine();
       if (line == null) break; // user pressed ctrl+d
 
       final var scanner = new Scanner(line);
