@@ -1,6 +1,6 @@
 {
   nixConfig.bash-prompt-prefix = ''\[\e[0;31m\](java) \e[0m'';
-  description = "JDK 21 env";
+  description = "JDK 23 env";
 
   inputs.flake-utils.url = "github:numtide/flake-utils";
 
@@ -17,7 +17,6 @@
             (_: _: {
               jre = graalvmDrv;
               jdk = graalvmDrv;
-              # jdk_headless = graalvmDrv;
             })
           ];
         };
@@ -109,12 +108,12 @@
             checkstyle
             (java-language-server.overrideMavenAttrs (_: {
               buildOffline = true;
-              mvnHash = "sha256-uQOGGhkHuTkpLTasYQY+TkJQ24mLEmSc7uPbQ4YOMK8=";
+              mvnHash = "sha256-kSoWd3r37bK/MYG8FKj6Kj3Z2wlHrSsDv3NdxbvhsaA=";
               src = fetchFromGitHub {
                 owner = "nya3jp";
                 repo = "java-language-server";
-                rev = "526cdc1d2cd1a634d79d7d79504cb906de721247";
-                hash = "sha256-1zhVt6vgPjisWmDjCMxzLPhEozVld7B7rmOuvWkytQo=";
+                rev = "0b256dfbe5e126112a90b70537b46b4813be6b93";
+                hash = "sha256-6lIEavMxuIaxT6WjlYinP4crSyyVuMMtsUHXuVhvBRM=";
               };
             }))
           ];
