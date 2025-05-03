@@ -20,7 +20,7 @@
 
           interface Visitor<R> { // extends Grammar.Visitor<R>''
       (lib.concatMapAttrsStringSep "\n" (record: _fields: ''
-          R visit${record}${name}(${record} expr);
+          R visit${record}${name}(${record} ${lib.toLower name});
         '')
         records)
       "}"

@@ -7,23 +7,23 @@ public interface Stmt { // extends Grammar
   abstract <R> R accept(Visitor<R> visitor);
 
   interface Visitor<R> { // extends Grammar.Visitor<R>
-    R visitBlockStmt(Block expr);
+    R visitBlockStmt(Block stmt);
 
-    R visitBreakStmt(Break expr);
+    R visitBreakStmt(Break stmt);
 
-    R visitExpressionStmt(Expression expr);
+    R visitExpressionStmt(Expression stmt);
 
-    R visitFunctionStmt(Function expr);
+    R visitFunctionStmt(Function stmt);
 
-    R visitIfStmt(If expr);
+    R visitIfStmt(If stmt);
 
-    R visitPrintStmt(Print expr);
+    R visitPrintStmt(Print stmt);
 
-    R visitReturnStmt(Return expr);
+    R visitReturnStmt(Return stmt);
 
-    R visitVarStmt(Var expr);
+    R visitVarStmt(Var stmt);
 
-    R visitWhileStmt(While expr);
+    R visitWhileStmt(While stmt);
   }
 
   record Block(List<Stmt> statements, boolean enclosedInLoop) implements Stmt {
