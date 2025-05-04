@@ -1,16 +1,18 @@
 package com.craftinginterpreters.lox;
 
-import static janw4ld.utils.Utils.supply;
-
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
-  boolean isRepl;
-  private final AstPrinter printer = new AstPrinter();
-  final Environment globals = new Environment();
-  private Environment environment = globals;
+  private final boolean isRepl;
   private boolean unwindingLoop = false;
+  private final AstPrinter printer = new AstPrinter();
+
+  private final Environment globals = new Environment();
+  private Environment environment = globals;
+  private final Map<Expr, Integer> locals = new HashMap<>();
 
   Interpreter(boolean isRepl) {
     this.isRepl = isRepl;
@@ -31,6 +33,32 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
               @Override
               public String toString() {
                 return "<native java System.currentTimeMillis>";
+              }
+            }));
+    globals.define(
+        "sleep",
+        Optional.of(
+            new LoxCallable() {
+              @Override
+              public int arity() {
+                return 1;
+              }
+
+              @Override
+              public Void call(Interpreter _i, List<Object> args) throws RuntimeException {
+                final var a = args.getFirst();
+                if (!(a instanceof Number duration))
+                  throw new RuntimeException("Expected `Number` argument.");
+                try {
+                  Thread.sleep(duration.longValue());
+                } catch (InterruptedException e) {
+                }
+                return null;
+              }
+
+              @Override
+              public String toString() {
+                return "<native java Thread.sleep>";
               }
             }));
   }
@@ -68,6 +96,10 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
   private void execute(Stmt stmt) {
     stmt.accept(this);
+  }
+
+  void resolve(Expr expr, int hops) {
+    locals.put(expr, hops);
   }
 
   private String stringify(Object object) {
@@ -151,17 +183,22 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
   @Override
   public Object visitCallExpr(Expr.Call expr) {
     final var callee = evaluate(expr.callee());
-    final var arguments = expr.arguments().stream().map(this::evaluate).toList();
-
     if (!(callee instanceof LoxCallable function)) {
       throw new RuntimeError(expr.paren(), "Can only call functions and classes.");
     }
+
+    final var arguments = expr.arguments().stream().map(this::evaluate).toList();
     if (arguments.size() != function.arity()) {
       throw new RuntimeError(
           expr.paren(),
           "Expected " + function.arity() + " arguments but got " + arguments.size() + ".");
     }
-    return function.call(this, arguments);
+
+    try {
+      return function.call(this, arguments);
+    } catch (RuntimeException e) {
+      throw new RuntimeError(expr.paren(), e.getMessage());
+    }
   }
 
   @Override
@@ -230,11 +267,15 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
   public Object visitVariableExpr(Expr.Variable expr) {
     final var name = expr.name();
     final var key = name.lexeme();
-    return environment
-        .get(key)
+    return lookUpVariable(key, expr)
         .orElseThrow(
-            supply(
-                new RuntimeError(expr, name, "Identifier `" + key + "` used before assignment")));
+            () -> new RuntimeError(expr, name, "Identifier `" + key + "` used before assignment"));
+  }
+
+  private Optional<Object> lookUpVariable(String name, Expr expr) {
+    return Optional.ofNullable(locals.get(expr))
+        .map(d -> environment.getAt(d, name))
+        .orElseGet(() -> globals.get(name));
   }
 
   @Override
@@ -242,8 +283,15 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     final var name = expr.name();
     final var key = name.lexeme();
     final var value = evaluate(expr.value()); // ! side effects always trigger
-    if (!environment.assign(key, value))
-      throw new RuntimeError(expr, name, "Undefined variable `" + key + "`.");
+
+    Optional.ofNullable(locals.get(expr))
+        .ifPresentOrElse(
+            d -> environment.assignAt(d, key, value),
+            () -> {
+              if (!globals.assign(key, value))
+                throw new RuntimeError(expr, name, "Undefined variable `" + key + "`.");
+            });
+
     return value;
   }
 
@@ -279,7 +327,7 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
   @Override
   public Void visitBlockStmt(Stmt.Block stmt) {
-    if (!stmt.enclosedInLoop()) unwindingLoop = false;
+    if (!stmt.enclosedInLoop()) unwindingLoop = false; // we're done unwinding our loops
     if (unwindingLoop) return null;
     executeBlock(stmt.statements(), new Environment(environment));
     return null;

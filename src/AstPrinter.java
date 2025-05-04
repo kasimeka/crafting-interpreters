@@ -116,7 +116,7 @@ class AstPrinter implements Expr.Visitor<String>, Stmt.Visitor<String> {
   @Override
   public String visitVarStmt(Stmt.Var stmt) {
     final var decl = "declare '" + stmt.name().lexeme();
-    return stmt.initializer().map(i -> renderTree(decl, i)).orElse(renderTree(decl));
+    return stmt.initializer().map(i -> renderTree(decl, i)).orElseGet(() -> renderTree(decl));
   }
 
   @Override
@@ -146,7 +146,7 @@ class AstPrinter implements Expr.Visitor<String>, Stmt.Visitor<String> {
 
   @Override
   public String visitReturnStmt(Stmt.Return stmt) {
-    return stmt.value().map(v -> renderTree("return", v)).orElse(renderTree("return"));
+    return stmt.value().map(v -> renderTree("return", v)).orElseGet(() -> renderTree("return"));
   }
 
   @Override

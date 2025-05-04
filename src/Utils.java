@@ -1,15 +1,10 @@
 package janw4ld.utils;
 
 import java.util.AbstractMap;
-import java.util.function.Supplier;
 
 public class Utils {
   public static <T> T id(T it) {
     return it;
-  }
-
-  public static <T> Supplier<T> supply(T it) {
-    return () -> it;
   }
 
   public static class Pair<F, S> extends AbstractMap.SimpleImmutableEntry<F, S> {

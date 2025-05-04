@@ -28,9 +28,29 @@ class Environment {
     return Optional.ofNullable(enclosing).map(e -> e.assign(name, value)).orElse(false);
   }
 
+  void assignAt(int distance, String name, Object value) {
+    ancestor(distance).values.put(name, value);
+  }
+
   Optional<Object> get(String name) {
     return values.containsKey(name)
         ? Optional.ofNullable(values.get(name))
         : Optional.ofNullable(enclosing).flatMap(e -> e.get(name));
+  }
+
+  Optional<Object> getAt(int distance, String name) {
+    return Optional.ofNullable(
+        Optional.ofNullable(ancestor(distance))
+            .orElseThrow(() -> new RuntimeException("unreachable"))
+            .values
+            .get(name));
+  }
+
+  Environment ancestor(int distance) {
+    Environment environment = this;
+    while (distance-- > 0) {
+      environment = environment.enclosing;
+    }
+    return environment;
   }
 }
