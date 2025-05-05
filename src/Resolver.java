@@ -12,7 +12,7 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
   }
 
   private final Interpreter interpreter;
-  private final Stack<Map<String, Boolean>> scopes = new Stack<>();
+  private final Stack<Map<String, Integer>> scopes = new Stack<>();
   private FunctionType currentFunction = FunctionType.NONE;
 
   Resolver(Interpreter interpreter) {
@@ -42,11 +42,15 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
   }
 
   private void beginScope() {
-    scopes.push(new HashMap<String, Boolean>());
+    scopes.push(new HashMap<String, Integer>());
   }
 
   private void endScope() {
-    scopes.pop();
+    final var scope = scopes.pop();
+    scope.forEach(
+        (k, v) -> {
+          if (v <= 0) System.err.println("WARNING: unused variable `" + k + "`.");
+        });
   }
 
   @Override
@@ -59,7 +63,7 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
 
   private void define(Token name) {
     if (scopes.isEmpty()) return;
-    scopes.peek().put(name.lexeme(), true);
+    scopes.peek().put(name.lexeme(), 0);
   }
 
   @Override
@@ -72,9 +76,12 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
 
   private void resolveLocal(Expr expr, Token name) {
     int hops = 0;
+    final var key = name.lexeme();
     for (var scope : scopes.reversed()) {
-      if (scope.containsKey(name.lexeme())) {
+      final var refCount = scope.get(key);
+      if (refCount != null) {
         interpreter.resolve(expr, hops);
+        scope.put(key, refCount + 1);
         return;
       }
       hops++;
