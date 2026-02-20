@@ -15,7 +15,7 @@ class AstPrinter implements Expr.Visitor<String>, Stmt.Visitor<String> {
     return stmt.accept(this);
   }
 
-  String print(List<Stmt> stmts) {
+  String print(List<? extends Stmt> stmts) {
     if (stmts.size() < 1) return "()";
     final var shouldNest = stmts.size() != 1;
     if (shouldNest) depth += 1;
@@ -136,7 +136,7 @@ class AstPrinter implements Expr.Visitor<String>, Stmt.Visitor<String> {
 
   @Override
   public String visitWhileStmt(Stmt.While stmt) {
-    return "(while " + print(stmt.condition()) + " " + print(stmt.body().statements());
+    return "(while " + print(stmt.condition()) + " " + print(stmt.body().statements()) + ")";
   }
 
   @Override
@@ -152,5 +152,25 @@ class AstPrinter implements Expr.Visitor<String>, Stmt.Visitor<String> {
   @Override
   public String visitFunctionStmt(Stmt.Function stmt) {
     return "(declare '" + stmt.name().lexeme() + " " + print(stmt.definition()) + ")";
+  }
+
+  @Override
+  public String visitClassStmt(Stmt.Class stmt) {
+    return "(class '" + stmt.name().lexeme() + " " + print(stmt.methods()) + ")";
+  }
+
+  @Override
+  public String visitGetExpr(Expr.Get expr) {
+    return renderTree("get '" + expr.name().lexeme(), expr.object());
+  }
+
+  @Override
+  public String visitSetExpr(Expr.Set expr) {
+    return renderTree("set '" + expr.name().lexeme(), expr.object(), expr.value());
+  }
+
+  @Override
+  public String visitThisExpr(Expr.This expr) {
+    return expr.keyword().lexeme().toString();
   }
 }

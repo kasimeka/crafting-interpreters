@@ -14,6 +14,8 @@ public interface Expr { // extends Grammar
 
     R visitFunctionExpr(Function expr);
 
+    R visitGetExpr(Get expr);
+
     R visitGroupingExpr(Grouping expr);
 
     R visitIfExpr(If expr);
@@ -21,6 +23,10 @@ public interface Expr { // extends Grammar
     R visitLiteralExpr(Literal expr);
 
     R visitLogicalExpr(Logical expr);
+
+    R visitSetExpr(Set expr);
+
+    R visitThisExpr(This expr);
 
     R visitUnaryExpr(Unary expr);
 
@@ -55,6 +61,13 @@ public interface Expr { // extends Grammar
     }
   }
 
+  record Get(Expr object, Token name) implements Expr {
+    @Override
+    public <R> R accept(Visitor<R> visitor) {
+      return visitor.visitGetExpr(this);
+    }
+  }
+
   record Grouping(Expr expression) implements Expr {
     @Override
     public <R> R accept(Visitor<R> visitor) {
@@ -80,6 +93,20 @@ public interface Expr { // extends Grammar
     @Override
     public <R> R accept(Visitor<R> visitor) {
       return visitor.visitLogicalExpr(this);
+    }
+  }
+
+  record Set(Expr object, Token name, Expr value) implements Expr {
+    @Override
+    public <R> R accept(Visitor<R> visitor) {
+      return visitor.visitSetExpr(this);
+    }
+  }
+
+  record This(Token keyword) implements Expr {
+    @Override
+    public <R> R accept(Visitor<R> visitor) {
+      return visitor.visitThisExpr(this);
     }
   }
 

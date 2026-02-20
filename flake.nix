@@ -1,6 +1,6 @@
 {
   nixConfig.bash-prompt-prefix = ''\[\e[0;31m\](java) \e[0m'';
-  description = "JDK 23 env";
+  description = "GraalVM 25 env";
 
   inputs.flake-utils.url = "github:numtide/flake-utils";
 
@@ -26,7 +26,7 @@
           ./hack/generate-grammar-classes.nix {}) [
           {
             name = "Expr";
-            imports = ["java.util.List" "java.util.Optional"];
+            imports = ["java.util.List"];
             records = {
               Logical = "Expr left, Token operator, Expr right";
               Binary = "Expr left, Token operator, Expr right";
@@ -37,6 +37,9 @@
               Variable = "Token name";
               Assign = "Token name, Expr value";
               Call = "Expr callee, Token paren, List<Expr> arguments";
+              Get = "Expr object, Token name";
+              Set = "Expr object, Token name, Expr value";
+              This = "Token keyword";
               Function = "List<Token> params, Stmt.Block body";
             };
           }
@@ -53,6 +56,7 @@
               Break = "";
               Return = "Token keyword, Optional<Expr> value";
               Function = "Token name, Expr.Function definition";
+              Class = "Token name, List<Stmt.Function> methods";
             };
           }
         ];
@@ -64,6 +68,7 @@
           inherit pname version graalvmDrv;
           src = "${jar}/share/java/${pname}.jar";
           extraNativeImageBuildArgs = ["--static" "--libc=musl" "-march=native"];
+          meta.mainProgram = pname;
         };
         jar = pkgs.stdenv.mkDerivation {
           inherit pname version;

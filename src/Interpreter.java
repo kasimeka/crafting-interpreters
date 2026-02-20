@@ -51,7 +51,7 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
                   throw new RuntimeException("Expected `Number` argument.");
                 try {
                   Thread.sleep(duration.longValue());
-                } catch (InterruptedException e) {
+                } catch (InterruptedException _e) {
                 }
                 return null;
               }
@@ -182,8 +182,7 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
   @Override
   public Object visitCallExpr(Expr.Call expr) {
-    final var callee = evaluate(expr.callee());
-    if (!(callee instanceof LoxCallable function)) {
+    if (!(evaluate(expr.callee()) instanceof LoxCallable function)) {
       throw new RuntimeError(expr.paren(), "Can only call functions and classes.");
     }
 
@@ -211,8 +210,26 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
       case TokenKind.AND -> {
         if (!isTruthy(left)) return left;
       }
+      default -> {} // empty on purpose
     }
     return evaluate(expr.right());
+  }
+
+  @Override
+  public Object visitSetExpr(Expr.Set expr) {
+    final var object = evaluate(expr.object());
+    if (object instanceof LoxClass.Instance o) {
+      final var value = evaluate(expr.value());
+      o.set(expr.name().lexeme(), value);
+      return value;
+    }
+    throw new RuntimeError(expr.name(), "Only instances have fields.");
+  }
+
+  @Override
+  public Object visitThisExpr(Expr.This expr) {
+    return lookUpVariable(expr.keyword().lexeme(), expr)
+        .orElseThrow(() -> new RuntimeError(expr.keyword(), "unreachable"));
   }
 
   @Override
@@ -274,8 +291,8 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
   private Optional<Object> lookUpVariable(String name, Expr expr) {
     return Optional.ofNullable(locals.get(expr))
-        .map(d -> environment.getAt(d, name))
-        .orElseGet(() -> globals.get(name));
+        .flatMap(d -> environment.getAt(d, name))
+        .or(() -> globals.get(name));
   }
 
   @Override
@@ -344,6 +361,28 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     } finally {
       this.environment = previous;
     }
+  }
+
+  @Override
+  public Void visitClassStmt(Stmt.Class stmt) {
+    final var key = stmt.name().lexeme();
+    environment.define(key, Optional.empty());
+    final Map<String, LoxFunction> methods = new HashMap<>();
+    for (var method : stmt.methods()) {
+      final var function = new LoxFunction(method, environment);
+      methods.put(method.name().lexeme(), function);
+    }
+    environment.assign(key, new LoxClass(key, methods));
+    return null;
+  }
+
+  @Override
+  public Object visitGetExpr(Expr.Get expr) {
+    final var object = evaluate(expr.object());
+    if (object instanceof LoxClass.Instance o) {
+      return o.get(this, expr.name());
+    }
+    throw new RuntimeError(expr.name(), "Only class instances have properties.");
   }
 
   @Override

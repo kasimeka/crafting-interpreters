@@ -33,6 +33,7 @@ class Parser {
 
   private Stmt declaration(boolean enclosedInLoop) {
     try {
+      if (tryConsume(CLASS)) return classDeclaration();
       if (tryConsume(FUN)) return function();
       if (tryConsume(VAR)) return varDeclaration();
       return statement(enclosedInLoop);
@@ -43,14 +44,34 @@ class Parser {
     }
   }
 
-  private Stmt function() {
-    if (!tryConsume(IDENTIFIER)) {
-      final var e = functionExpr();
-      mustConsume(SEMICOLON, "Expected ';' after expression.");
-      return new Stmt.Expression(e);
+  private Stmt classDeclaration() {
+    mustConsume(IDENTIFIER, "Expected class name.");
+    final var name = current();
+    mustConsume(LEFT_BRACE, "Expected '{' before class body.");
+
+    final var methods = new ArrayList<Stmt.Function>();
+    while (!nextIs(RIGHT_BRACE) && !atEof()) {
+      methods.add(functionStmt());
     }
+
+    mustConsume(RIGHT_BRACE, "Expected '}' after class body.");
+
+    return new Stmt.Class(name, methods);
+  }
+
+  private Stmt.Function functionStmt() {
+    mustConsume(IDENTIFIER, "Expected name in a function statement.");
     final var name = current();
     return new Stmt.Function(name, functionExpr());
+  }
+
+  private Stmt function() {
+    if (nextIs(IDENTIFIER)) {
+      return functionStmt();
+    }
+    final var e = functionExpr();
+    mustConsume(SEMICOLON, "Expected ';' after expression.");
+    return new Stmt.Expression(e);
   }
 
   private Stmt varDeclaration() {
@@ -125,7 +146,7 @@ class Parser {
 
     var elseBranch = Optional.<Stmt.Block>empty();
     if (tryConsume(ELSE)) {
-      elseBranch = Optional.of(block("Expected '{' after `else`.", enclosedInLoop));
+      elseBranch = Optional.ofNullable(block("Expected '{' after `else`.", enclosedInLoop));
     }
 
     return new Stmt.If(condition, thenBranch, elseBranch);
@@ -186,7 +207,7 @@ class Parser {
 
   private Expr.Function functionExpr() {
     mustConsume(LEFT_PAREN, "Expect '(' after fun declaration.");
-    var parameters = new ArrayList<Token>();
+    final var parameters = new ArrayList<Token>();
     if (!nextIs(RIGHT_PAREN)) {
       do {
         if (parameters.size() >= 255) {
@@ -205,9 +226,11 @@ class Parser {
     if (tryConsume(EQUAL)) {
       final var equals = current();
       final var value = assignment();
-      if (expr instanceof Expr.Variable) {
-        final var name = ((Expr.Variable) expr).name();
+      if (expr instanceof Expr.Variable v) {
+        final var name = v.name();
         return new Expr.Assign(name, value);
+      } else if (expr instanceof Expr.Get g) {
+        return new Expr.Set(g.object(), g.name(), value);
       }
       error(equals, "Invalid assignment target.");
     }
@@ -285,20 +308,28 @@ class Parser {
 
   private Expr call() {
     var expr = primary();
-    while (tryConsume(LEFT_PAREN)) {
-      final var arguments = new ArrayList<Expr>();
-      if (!nextIs(RIGHT_PAREN)) {
-        do {
-          if (arguments.size() >= 255) {
-            error(current(), "Can't have more than 255 arguments.");
-          }
-          arguments.add(expression());
-        } while (tryConsume(COMMA));
+    while (true) {
+      if (tryConsume(LEFT_PAREN)) {
+        final var arguments = new ArrayList<Expr>();
+        if (!nextIs(RIGHT_PAREN)) {
+          do {
+            if (arguments.size() >= 255) {
+              error(current(), "Can't have more than 255 arguments.");
+            }
+            arguments.add(expression());
+          } while (tryConsume(COMMA));
+        }
+        mustConsume(RIGHT_PAREN, "Expected ')' after arguments.");
+        final var paren = current();
+        expr = new Expr.Call(expr, paren, arguments);
+      } else if (tryConsume(DOT)) {
+        mustConsume(IDENTIFIER, "Expected property name after '.'.");
+        expr = new Expr.Get(expr, current());
+      } else {
+        break;
       }
-      mustConsume(RIGHT_PAREN, "Expected ')' after arguments.");
-      final var paren = current();
-      expr = new Expr.Call(expr, paren, arguments);
     }
+
     return expr;
   }
 
@@ -314,6 +345,7 @@ class Parser {
         mustConsume(RIGHT_PAREN, "Expected ')' after expression.");
         yield new Expr.Grouping(e);
       }
+      case THIS -> new Expr.This(current());
       case IDENTIFIER -> new Expr.Variable(current());
       default -> throw error(current(), "Expected expression.");
     };
@@ -343,10 +375,10 @@ class Parser {
     return false;
   }
 
-  private boolean mustConsume(TokenKind kind, String message) {
+  private void mustConsume(TokenKind kind, String message) {
     if (nextIs(kind)) {
       advance();
-      return true;
+      return;
     }
     throw error(peek(), message);
   }

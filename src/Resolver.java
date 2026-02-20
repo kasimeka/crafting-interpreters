@@ -8,7 +8,8 @@ import java.util.Stack;
 class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
   private enum FunctionType {
     NONE,
-    FUNCTION
+    FUNCTION,
+    METHOD
   }
 
   private final Interpreter interpreter;
@@ -27,8 +28,22 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
     return null;
   }
 
+  @Override
+  public Void visitClassStmt(Stmt.Class stmt) {
+    define(stmt.name().lexeme());
+
+    beginScope();
+    define("this");
+    for (var method : stmt.methods()) {
+      resolveFunction(method.definition(), FunctionType.METHOD);
+    }
+    endScope();
+
+    return null;
+  }
+
   void resolve(List<Stmt> statements) {
-    for (Stmt statement : statements) {
+    for (var statement : statements) {
       resolve(statement);
     }
   }
@@ -54,34 +69,39 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
   }
 
   @Override
+  public Void visitGetExpr(Expr.Get expr) {
+    resolve(expr.object());
+    return null;
+  }
+
+  @Override
   public Void visitVarStmt(Stmt.Var stmt) {
     // declare(stmt.name());
-    define(stmt.name()); // the book hates this one weird trick!
+    define(stmt.name().lexeme()); // the book hates this one weird trick!
     stmt.initializer().ifPresent(this::resolve);
     return null;
   }
 
-  private void define(Token name) {
+  private void define(String name) {
     if (scopes.isEmpty()) return;
-    scopes.peek().put(name.lexeme(), 0);
+    scopes.peek().put(name, 0);
   }
 
   @Override
   public Void visitVariableExpr(Expr.Variable expr) {
     /* the var x = x error goes here */
 
-    resolveLocal(expr, expr.name());
+    resolveLocal(expr, expr.name().lexeme());
     return null;
   }
 
-  private void resolveLocal(Expr expr, Token name) {
+  private void resolveLocal(Expr expr, String name) {
     int hops = 0;
-    final var key = name.lexeme();
     for (var scope : scopes.reversed()) {
-      final var refCount = scope.get(key);
+      final var refCount = scope.get(name);
       if (refCount != null) {
         interpreter.resolve(expr, hops);
-        scope.put(key, refCount + 1);
+        scope.put(name, refCount + 1);
         return;
       }
       hops++;
@@ -91,13 +111,13 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
   @Override
   public Void visitAssignExpr(Expr.Assign expr) {
     resolve(expr.value());
-    resolveLocal(expr, expr.name());
+    resolveLocal(expr, expr.name().lexeme());
     return null;
   }
 
   @Override
   public Void visitFunctionStmt(Stmt.Function stmt) {
-    define(stmt.name());
+    define(stmt.name().lexeme());
     resolve(stmt.definition());
     return null;
   }
@@ -161,18 +181,21 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
 
   @Override
   public Void visitFunctionExpr(Expr.Function expr) {
-    final var enclosingFunction = currentFunction;
+    resolveFunction(expr, FunctionType.FUNCTION);
+    return null;
+  }
 
-    currentFunction = FunctionType.FUNCTION;
+  // used by function exprs, function stmts and methods
+  private void resolveFunction(Expr.Function expr, FunctionType type) {
+    final var enclosingFunction = currentFunction;
+    currentFunction = type;
     beginScope();
-    for (Token param : expr.params()) {
-      define(param);
+    for (var param : expr.params()) {
+      define(param.lexeme());
     }
     resolve(expr.body());
     endScope();
     currentFunction = enclosingFunction;
-
-    return null;
   }
 
   @Override
@@ -204,6 +227,19 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
   @Override
   public Void visitUnaryExpr(Expr.Unary expr) {
     resolve(expr.right());
+    return null;
+  }
+
+  @Override
+  public Void visitSetExpr(Expr.Set expr) {
+    resolve(expr.value());
+    resolve(expr.object());
+    return null;
+  }
+
+  @Override
+  public Void visitThisExpr(Expr.This expr) {
+    resolveLocal(expr, expr.keyword().lexeme());
     return null;
   }
 }

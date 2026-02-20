@@ -4,11 +4,13 @@ import java.util.List;
 import java.util.Optional;
 
 class AnonFunction implements LoxCallable {
-  private final Expr.Function definition;
-  private final Environment closure;
+  final Expr.Function definition;
+  private final int hash;
+  final Environment closure;
 
   AnonFunction(Expr.Function definition, Environment closure) {
     this.definition = definition;
+    this.hash = definition.hashCode();
     this.closure = closure;
   }
 
@@ -31,6 +33,6 @@ class AnonFunction implements LoxCallable {
   }
 
   public String toString() {
-    return "<anonymous fn " + Integer.toHexString(definition.hashCode()) + ">";
+    return "<anonymous fn " + Integer.toHexString(hash) + ">";
   }
 }

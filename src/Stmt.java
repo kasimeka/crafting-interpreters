@@ -11,6 +11,8 @@ public interface Stmt { // extends Grammar
 
     R visitBreakStmt(Break stmt);
 
+    R visitClassStmt(Class stmt);
+
     R visitExpressionStmt(Expression stmt);
 
     R visitFunctionStmt(Function stmt);
@@ -37,6 +39,13 @@ public interface Stmt { // extends Grammar
     @Override
     public <R> R accept(Visitor<R> visitor) {
       return visitor.visitBreakStmt(this);
+    }
+  }
+
+  record Class(Token name, List<Stmt.Function> methods) implements Stmt {
+    @Override
+    public <R> R accept(Visitor<R> visitor) {
+      return visitor.visitClassStmt(this);
     }
   }
 
